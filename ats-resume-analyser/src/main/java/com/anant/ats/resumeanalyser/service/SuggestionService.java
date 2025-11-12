@@ -7,7 +7,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -27,34 +26,41 @@ public class SuggestionService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-latest:generateContent?key=";
+    // This is our working API endpoint
+    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=";
 
-    public String generateSuggestions(String resumeText, String jdText, Set<String> missingKeywords) {
+    /**
+     * UPDATED: Now accepts 'companyType'
+     */
+    public String generateSuggestions(String resumeText, String jdText, Set<String> missingKeywords, String companyType) {
         
         String apiUrl = GEMINI_API_URL + apiKey;
-
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        Map<String, Object> textPart = Map.of("text", buildPrompt(resumeText, jdText, missingKeywords));
+        // 1. Build the new, powerful prompt
+        String prompt = buildPrompt(resumeText, jdText, missingKeywords, companyType);
+
+        // 2. Build the JSON request body
+        Map<String, Object> textPart = Map.of("text", prompt);
         Map<String, Object> content = Map.of("parts", Collections.singletonList(textPart));
         Map<String, Object> requestBody = Map.of("contents", Collections.singletonList(content));
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
+        // 3. Call the API
         try {
             String response = restTemplate.postForObject(apiUrl, entity, String.class);
             return parseResponse(response);
-
-        } catch (HttpClientErrorException e) {
-            e.printStackTrace();
-            return "Error: Could not generate AI suggestions. " + e.getStatusText() + " " + e.getResponseBodyAsString();
         } catch (Exception e) {
             e.printStackTrace();
             return "Error: Could not generate AI suggestions. " + e.getMessage();
         }
     }
 
+    /**
+     * Helper method to parse the complex JSON response from Gemini
+     */
     private String parseResponse(String jsonResponse) {
         try {
             ObjectMapper mapper = new ObjectMapper();
@@ -69,6 +75,7 @@ public class SuggestionService {
                               .asText();
             
             if (text.isEmpty()) {
+                // Handle cases where the API might have blocked the response (safety settings)
                 return "Error: Could not extract text from AI response. It may have been blocked for safety reasons. Response: " + jsonResponse;
             }
             return text;
@@ -79,37 +86,53 @@ public class SuggestionService {
         }
     }
 
-    private String buildPrompt(String resumeText, String jdText, Set<String> missingKeywords) {
+    /**
+     * UPDATED: This is our new, much more powerful prompt that
+     * uses the 'companyType' and asks for a full analysis.
+     */
+    private String buildPrompt(String resumeText, String jdText, Set<String> missingKeywords, String companyType) {
+        
         String prompt = """
-            You are a professional career coach and expert resume writer.
-            A user is applying for a job and needs help updating their resume.
+            You are an expert HR recruiter and professional career coach.
+            A user is applying for a **%s-Based Company**.
+            Analyze their resume against the job description (JD) and provide a detailed review.
 
-            Here is the user's resume:
-            --- RESUME START ---
+            **User's Resume:**
+            ---
             %s
-            --- RESUME END ---
+            ---
 
-            Here is the job description they are applying for:
-            --- JOB START ---
+            **Job Description (JD):**
+            ---
             %s
-            --- JOB END ---
+            ---
 
-            My simple analysis shows the user is missing these keywords: %s
+            **My simple analysis found these missing keywords:** %s
 
-            Your task is to provide 3-5 actionable, full-sentence suggestions.
-            These suggestions should help the user thoughtfully incorporate the missing keywords
-            into their resume, based on the experience they have already listed.
-            Do not just tell them to "add the keyword."
-            
-            Example good suggestion: "I see the job requires 'Spring Boot' and your resume lists 'Java'. You could update one of your project descriptions to be: 'Developed a RESTful API for [Project] using Java and the Spring Boot framework.'"
-            Example bad suggestion: "Add 'Spring Boot' to your resume."
+            **Analysis Task:**
+            Please provide your analysis in the following structured Markdown format:
 
-            Provide the suggestions in a clear, easy-to-read format.
+            ## Job Fit Score
+            Give a percentage score (e.g., 75%%) and a one-sentence justification.
+
+            ## Strengths
+            * List 2-3 key strengths from the resume that directly align with the JD.
+
+            ## Weaknesses & Gaps
+            * List 2-3 critical gaps or weaknesses where the resume does not meet the JD's requirements.
+
+            ## AI-Powered Suggestions
+            * Based on the weaknesses, provide 3-5 actionable, full-sentence suggestions
+                for how the user can (truthfully) update their resume.
+            * **Tailor this advice for a %s-Based company.**
+                (e.g., for 'Product', focus on impact and innovation. For 'Service', focus on clients and adaptability.)
+
+            ## Redundancy Check
+            * Point out any skills or phrases that are repeated unnecessarily and could be removed.
+                If there are no issues, just say "No redundancy issues found."
             """;
         
-        return String.format(prompt, resumeText, jdText, missingKeywords.toString());
+        // We insert 'companyType' twice into the prompt for context
+        return String.format(prompt, companyType, resumeText, jdText, missingKeywords.toString(), companyType);
     }
-
-    
-    
 }

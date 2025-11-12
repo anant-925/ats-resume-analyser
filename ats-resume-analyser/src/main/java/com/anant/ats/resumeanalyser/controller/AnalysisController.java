@@ -1,7 +1,6 @@
 package com.anant.ats.resumeanalyser.controller;
 
 import com.anant.ats.resumeanalyser.service.AnalysisService;
-// import com.anant.ats.resumeanalyser.service.SuggestionService;
 import com.anant.ats.resumeanalyser.service.TextExtractionService;
 import org.apache.tika.exception.TikaException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +25,6 @@ public class AnalysisController {
     
     @GetMapping("/")
     public String homePage(Model model) {
-
         if (!model.containsAttribute("result")) {
             model.addAttribute("result", null);
         }
@@ -36,9 +34,9 @@ public class AnalysisController {
     @PostMapping("/analyze")
     public String analyzeResume(@RequestParam("resumeFile") MultipartFile resumeFile,
                                 @RequestParam("jobDescription") String jobDescription,
+                                @RequestParam("companyType") String companyType,
                                 RedirectAttributes redirectAttributes) {
 
-        // 1. Basic Validation
         if (resumeFile.isEmpty()) {
             redirectAttributes.addFlashAttribute("error", "Please upload a resume file.");
             return "redirect:/";
@@ -51,16 +49,16 @@ public class AnalysisController {
         try {
             String resumeText = textExtractionService.extractTextFromFile(resumeFile);
 
-            AnalysisService.AnalysisResult result = analysisService.analyze(resumeText, jobDescription);
+            AnalysisService.AnalysisResult result = analysisService.analyze(resumeText, jobDescription, companyType, resumeFile);
+            
             redirectAttributes.addFlashAttribute("result", result);
             redirectAttributes.addFlashAttribute("fileName", resumeFile.getOriginalFilename());
 
         } catch (IOException | TikaException | IllegalArgumentException e) {
-            e.printStackTrace(); // Log the error
+            e.printStackTrace();
             redirectAttributes.addFlashAttribute("error", "Error processing file: " + e.getMessage());
         }
 
         return "redirect:/";
     }
-   
 }
