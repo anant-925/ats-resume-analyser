@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Register - ATS Analyser</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: radial-gradient(circle at top left, #7b2ff7, #4facfe);
+      min-height: 100vh;
+      overflow-x: hidden;
+      color: #f2f2f2;
+    }
+    .main-container {
+      padding-top: 4rem; padding-bottom: 5rem; position: relative; z-index: 2;
+    }
+    .analyzer-card {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 1rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+    }
+    .form-section label {
+      color: #eaeaea; font-weight: 600;
+    }
+    textarea, input, select {
+      border-radius: 0.75rem !important; border: none;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+      transition: box-shadow 0.3s ease;
+    }
+    textarea:focus, input:focus, select:focus {
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.3); outline: none;
+    }
+    .analyze-btn {
+      background: linear-gradient(90deg, #ff6a00, #ee0979);
+      border: none; color: #fff; font-weight: 600;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .analyze-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 10px 25px rgba(238, 9, 121, 0.4);
+    }
+    .animated-background {
+      position: fixed; top: 0; left: 0; width: 100%;
+      height: 100%; z-index: 0; overflow: hidden;
+    }
+    .animated-shape {
+      position: absolute; border-radius: 50%;
+      background: rgba(255, 255, 255, 0.15);
+      animation: floatShape 12s ease-in-out infinite;
+    }
+    @keyframes floatShape {
+      0% { transform: translateY(0px) scale(1); opacity: 0.8; }
+      50% { transform: translateY(-120px) scale(1.2); opacity: 1; }
+      100% { transform: translateY(0px) scale(1); opacity: 0.8; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="animated-background">
+    <span class="animated-shape" style="width: 60px; height: 60px; top: 10%; left: 20%; animation-duration: 10s;"></span>
+    <span class="animated-shape" style="width: 100px; height: 100px; top: 50%; left: 70%; animation-duration: 14s;"></span>
+  </div>
+
+  <div class="container main-container">
+    <div class="row justify-content-center">
+      <div class="col-lg-6">
+        <div class="analyzer-card p-4 p-md-5 animate__animated animate__fadeIn">
+          <div class="header-section text-center mb-4">
+            <h1 class="fw-bold mb-2">Create Account</h1>
+            <p class="text-light opacity-75">Join to start analyzing your resumes.</p>
+          </div>
+
+          <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}"></div>
+
+          <form method="POST" th:action="@{/register}" class="form-section">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+
+            <div class="mb-3">
+              <label for="email" class="form-label">Email</label>
+              <input type="email" class="form-control" id="email" name="email" required />
+            </div>
+            <div class="mb-3">
+              <label for="username" class="form-label">Username</label>
+              <input type="text" class="form-control" id="username" name="username" required />
+            </div>
+            <div class="mb-3">
+              <label for="password" class="form-label">Password</label>
+              <input type="password" class="form-control" id="password" name="password" required />
+            </div>
+            <button type="submit" class="btn analyze-btn btn-lg w-100 mt-3">Register</button>
+          </form>
+
+          <div class="text-center mt-4">
+             <a th:href="@{/login}" class="text-light">Already have an account? Log in</a>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

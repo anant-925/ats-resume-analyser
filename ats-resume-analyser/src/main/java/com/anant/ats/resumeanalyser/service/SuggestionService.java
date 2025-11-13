@@ -14,7 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Collections;
 import java.util.Map;
-import java.util.Set;
+// The 'Set' import is no longer needed
 
 @Profile("!test")
 @Service
@@ -26,20 +26,19 @@ public class SuggestionService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    // This is our working API endpoint
     private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=";
 
     /**
-     * UPDATED: Now accepts 'companyType'
+     * UPDATED: The 'missingKeywords' parameter is now removed.
      */
-    public String generateSuggestions(String resumeText, String jdText, Set<String> missingKeywords, String companyType) {
+    public String generateSuggestions(String resumeText, String jdText, String companyType) {
         
         String apiUrl = GEMINI_API_URL + apiKey;
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        // 1. Build the new, powerful prompt
-        String prompt = buildPrompt(resumeText, jdText, missingKeywords, companyType);
+        // 1. Build the prompt
+        String prompt = buildMasterPrompt(resumeText, jdText, companyType);
 
         // 2. Build the JSON request body
         Map<String, Object> textPart = Map.of("text", prompt);
@@ -58,9 +57,6 @@ public class SuggestionService {
         }
     }
 
-    /**
-     * Helper method to parse the complex JSON response from Gemini
-     */
     private String parseResponse(String jsonResponse) {
         try {
             ObjectMapper mapper = new ObjectMapper();
@@ -75,11 +71,9 @@ public class SuggestionService {
                               .asText();
             
             if (text.isEmpty()) {
-                // Handle cases where the API might have blocked the response (safety settings)
-                return "Error: Could not extract text from AI response. It may have been blocked for safety reasons. Response: " + jsonResponse;
+                return "Error: Could not extract text from AI response. " + jsonResponse;
             }
             return text;
-
         } catch (Exception e) {
             e.printStackTrace();
             return "Error: Could not parse AI response. " + e.getMessage();
@@ -87,15 +81,15 @@ public class SuggestionService {
     }
 
     /**
-     * UPDATED: This is our new, much more powerful prompt that
-     * uses the 'companyType' and asks for a full analysis.
+     * UPDATED: The 'missingKeywords' parameter is now removed.
      */
-    private String buildPrompt(String resumeText, String jdText, Set<String> missingKeywords, String companyType) {
+    private String buildMasterPrompt(String resumeText, String jdText, String companyType) {
         
         String prompt = """
             You are an expert HR recruiter and professional career coach.
             A user is applying for a **%s-Based Company**.
             Analyze their resume against the job description (JD) and provide a detailed review.
+            The analysis MUST be in structured Markdown format.
 
             **User's Resume:**
             ---
@@ -107,32 +101,39 @@ public class SuggestionService {
             %s
             ---
 
-            **My simple analysis found these missing keywords:** %s
-
             **Analysis Task:**
             Please provide your analysis in the following structured Markdown format:
 
             ## Job Fit Score
             Give a percentage score (e.g., 75%%) and a one-sentence justification.
 
-            ## Strengths
+            ## Resume Strengths
             * List 2-3 key strengths from the resume that directly align with the JD.
 
-            ## Weaknesses & Gaps
+            ## Resume Weaknesses
             * List 2-3 critical gaps or weaknesses where the resume does not meet the JD's requirements.
 
-            ## AI-Powered Suggestions
-            * Based on the weaknesses, provide 3-5 actionable, full-sentence suggestions
-                for how the user can (truthfully) update their resume.
-            * **Tailor this advice for a %s-Based company.**
-                (e.g., for 'Product', focus on impact and innovation. For 'Service', focus on clients and adaptability.)
+            ## Keyword Optimization
+            * **Matching Keywords:** List the top 5-10 keywords found in both the resume and JD.
+            * **Missing Keywords:** List the top 5-10 keywords from the JD that are *missing* from the resume.
+            * **Acronym Check:** Note if acronyms (e.g., 'ERP') are used without being spelled out, or vice-versa.
 
+            ## Action Verbs & Metrics
+            * **Action Verbs:** Check if bullet points start with strong action verbs (e.g., 'Managed,' 'Developed'). List any weak examples found (e.g., 'Responsible for...').
+            * **Quantifiable Achievements:** Check if the resume uses metrics (e.g., '...by 15%%', '...over 100 users'). Give a specific example of where they could add a metric.
+            
             ## Redundancy Check
             * Point out any skills or phrases that are repeated unnecessarily and could be removed.
-                If there are no issues, just say "No redundancy issues found."
+              If no issues, just say "No major redundancy issues found."
+
+            ## AI-Powered Suggestions
+            * Based on the weaknesses, provide 2-3 actionable, full-sentence suggestions
+              for how the user can (truthfully) update their resume.
+            * **Tailor this advice for a %s-Based company.**
+              (e.g., for 'Product', focus on impact and innovation. For 'Service', focus on clients and adaptability.)
             """;
         
-        // We insert 'companyType' twice into the prompt for context
-        return String.format(prompt, companyType, resumeText, jdText, missingKeywords.toString(), companyType);
+        // UPDATED: The 'missingKeywords' argument is removed from String.format()
+        return String.format(prompt, companyType, resumeText, jdText, companyType);
     }
 }

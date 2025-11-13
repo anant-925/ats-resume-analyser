@@ -1,130 +1,112 @@
 package com.anant.ats.resumeanalyser.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile; // <-- ADD THIS IMPORT
+import com.anant.ats.resumeanalyser.model.AnalysisReport;
+import com.anant.ats.resumeanalyser.model.User;
+import com.anant.ats.resumeanalyser.repository.AnalysisReportRepository;
+import com.anant.ats.resumeanalyser.repository.UserRepository;
 
-import java.util.ArrayList; // <-- ADD THIS IMPORT
-import java.util.Arrays;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List; // <-- ADD THIS IMPORT
+import java.util.List;
 import java.util.Set;
-import java.util.regex.Matcher; // <-- ADD THIS IMPORT
-import java.util.regex.Pattern; // <-- ADD THIS IMPORT
-import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class AnalysisService {
 
     @Autowired
     private SuggestionService suggestionService;
+    
+    @Autowired
+    private UserRepository userRepository;
 
-    private static final Set<String> STOP_WORDS = Set.of(
-        "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
-        "has", "he", "in", "is", "it", "its", "of", "on", "that", "the",
-        "to", "was", "were", "will", "with", "you", "your", "job", "description",
-        "requirements", "experience", "skills", "responsibilities"
-    );
+    @Autowired
+    private AnalysisReportRepository reportRepository;
 
-    /**
-     * UPDATED: Now includes a List to hold our new compliance warnings.
-     */
+    // This is the object our controller receives
     public record AnalysisResult(
-        int matchPercentage,
-        Set<String> matchingKeywords,
-        Set<String> missingKeywords,
         String summary,
         String aiSuggestions,
-        List<String> complianceWarnings // <-- NEW FIELD
+        List<String> complianceWarnings
     ) {}
 
     /**
-     * Cleans and tokenizes text into a set of unique keywords.
+     * This is the main public method called by the controller.
+     * It runs the analysis AND saves the report to the database.
      */
-    private Set<String> extractKeywords(String text) {
-        if (text == null || text.isBlank()) return Set.of();
-        return Arrays.stream(text.toLowerCase()
-                        .replaceAll("[^a-zA-Z0-9\\s]", "")
-                        .split("\\s+"))
-                        .filter(word -> word.length() > 1 && !STOP_WORDS.contains(word))
-                        .collect(Collectors.toSet());
+    public AnalysisResult analyzeAndSave(String resumeText, String jdText, String companyType, MultipartFile file, String username) {
+        
+        // 1. Run the private analysis method
+        AnalysisResult result = analyze(resumeText, jdText, companyType, file);
+
+        // 2. Get the logged-in user
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+
+        // 3. Create a new report object
+        AnalysisReport report = new AnalysisReport();
+        report.setUser(user);
+        report.setFileName(file.getOriginalFilename());
+        report.setJobDescriptionSummary(jdText.substring(0, Math.min(jdText.length(), 100)) + "..."); // Create a short summary
+        report.setAiReport(result.aiSuggestions());
+        report.setComplianceWarnings(String.join("\n", result.complianceWarnings())); // Convert list to a string
+        report.setAnalysisDate(LocalDateTime.now());
+
+        // 4. Save the report to the database
+        reportRepository.save(report);
+
+        // 5. Return the result to the controller
+        return result;
     }
 
+
     /**
-     * NEW: A method to run all our code-based compliance checks.
+     * This private method performs the actual analysis.
+     * It correctly accepts 'jdText' as a parameter.
+     */
+    private AnalysisResult analyze(String resumeText, String jdText, String companyType, MultipartFile file) {
+        
+        List<String> complianceWarnings = runComplianceChecks(resumeText, file);
+        
+        // Call the AI service (which also needs jdText)
+        String aiFeedback = suggestionService.generateSuggestions(resumeText, jdText, companyType);
+        
+        String summary = "AI analysis complete. See the full report below.";
+
+        return new AnalysisResult(summary, aiFeedback, complianceWarnings);
+    }
+    
+    /**
+     * This method runs simple, code-based checks.
      */
     private List<String> runComplianceChecks(String resumeText, MultipartFile file) {
         List<String> warnings = new ArrayList<>();
-
-        // 1. File Type Check (from your list)
+        
+        // File Type Check
         String filename = file.getOriginalFilename();
         if (filename != null && !filename.endsWith(".pdf") && !filename.endsWith(".docx")) {
-            warnings.add("Warning: You uploaded a '" + filename.substring(filename.lastIndexOf(".") + 1) + "' file. For best results, always use .pdf or .docx.");
+            warnings.add("File Type: You uploaded a '" + filename.substring(filename.lastIndexOf(".") + 1) + "' file. For ATS, always use .pdf or .docx.");
         }
 
-        // 2. Consistent Dates Check (from your list)
-        // This regex finds dates like "MM/YYYY" or "Month YYYY"
-        Pattern pattern = Pattern.compile(
-            "\\b(0[1-9]|1[0-2])\\/(\\d{4})\\b|\\b(January|February|March|April|May|June|July|August|September|October|November|December)\\s(\\d{4})\\b",
-            Pattern.CASE_INSENSITIVE
-        );
+        // Consistent Dates Check
+        Pattern pattern = Pattern.compile("\\b(0[1-9]|1[0-2])\\/(\\d{4})\\b|\\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\s(\\d{4})\\b", Pattern.CASE_INSENSITIVE);
         Matcher matcher = pattern.matcher(resumeText);
-
         Set<String> dateFormatsFound = new HashSet<>();
         while (matcher.find()) {
-            if (matcher.group(1) != null) { // Found "MM/YYYY"
-                dateFormatsFound.add("MM/YYYY");
-            }
-            if (matcher.group(3) != null) { // Found "Month YYYY"
-                dateFormatsFound.add("Month YYYY");
-            }
+            if (matcher.group(1) != null) dateFormatsFound.add("MM/YYYY");
+            if (matcher.group(3) != null) dateFormatsFound.add("Month YYYY");
         }
-
         if (dateFormatsFound.size() > 1) {
-            warnings.add("Warning: You use inconsistent date formats (e.g., both 'MM/YYYY' and 'Month YYYY'). Pick one and stick to it.");
-        }
-        if (dateFormatsFound.isEmpty()) {
-            warnings.add("Note: No standard date formats (like 'MM/YYYY' or 'Month YYYY') were found. Make sure your dates are clear.");
+            warnings.add("Date Format: You use inconsistent date formats (e.g., both 'MM/YYYY' and 'Month YYYY'). Pick one and stick to it.");
         }
 
-        // 3. (Future checks like headers, columns, etc. would be added here)
-        
         return warnings;
-    }
-
-
-    /**
-     * UPDATED: Now accepts the 'file' to run compliance checks.
-     */
-    public AnalysisResult analyze(String resumeText, String jdText, String companyType, MultipartFile file) {
-        
-        Set<String> resumeKeywords = extractKeywords(resumeText);
-        Set<String> jdKeywords = extractKeywords(jdText);
-
-        if (jdKeywords.isEmpty()) {
-            return new AnalysisResult(0, Set.of(), Set.of(), "Job Description is empty or contains no keywords.", "N/A", List.of());
-        }
-
-        // --- Keyword analysis ---
-        Set<String> matchingKeywords = new HashSet<>(jdKeywords);
-        matchingKeywords.retainAll(resumeKeywords);
-
-        Set<String> missingKeywords = new HashSet<>(jdKeywords);
-        missingKeywords.removeAll(resumeKeywords);
-
-        double score = ((double) matchingKeywords.size() / jdKeywords.size()) * 100;
-        int matchPercentage = (int) Math.round(score);
-
-        String summary = String.format("Found %d out of %d job description keywords.", 
-                                       matchingKeywords.size(), jdKeywords.size());
-
-        // --- NEW: Run Compliance Checks ---
-        List<String> complianceWarnings = runComplianceChecks(resumeText, file);
-
-        // --- AI Suggestions ---
-        String aiFeedback = suggestionService.generateSuggestions(resumeText, jdText, missingKeywords, companyType);
-
-        // --- Return the complete result ---
-        return new AnalysisResult(matchPercentage, matchingKeywords, missingKeywords, summary, aiFeedback, complianceWarnings);
     }
 }
