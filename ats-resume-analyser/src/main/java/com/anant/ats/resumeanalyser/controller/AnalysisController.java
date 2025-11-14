@@ -17,7 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.io.IOException;
-import java.security.Principal; // <-- ADD THIS IMPORT
+import java.security.Principal; 
 
 @Controller 
 public class AnalysisController {
@@ -46,7 +46,7 @@ public class AnalysisController {
                                 @RequestParam("jobDescription") String jobDescription,
                                 @RequestParam("companyType") String companyType,
                                 RedirectAttributes redirectAttributes,
-                                Principal principal) { // <-- ADD 'Principal'
+                                Principal principal) { 
 
         // Check if user is logged in
         if (principal == null) {

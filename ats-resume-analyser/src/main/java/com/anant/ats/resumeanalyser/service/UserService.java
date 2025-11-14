@@ -28,8 +28,6 @@ public class UserService {
         if (userRepository.findByUsername(username).isPresent()) {
             throw new Exception("Username already exists: " + username);
         }
-        // (In a production app, you'd check for email too)
-
         // Hash the password before saving
         String hashedPassword = passwordEncoder.encode(password);
 

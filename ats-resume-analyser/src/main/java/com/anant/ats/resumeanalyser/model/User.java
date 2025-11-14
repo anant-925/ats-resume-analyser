@@ -7,7 +7,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Column;
 
-@Entity // Tells JPA this is a database model
+@Entity 
 @Table(name = "users") // Maps this class to the 'users' table
 public class User {
 
@@ -24,9 +24,7 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
     
-    // --- Constructors, Getters & Setters ---
-    // (Lombok could also handle this)
-    
+    // --- Constructors, Getters & Setters ---    
     public User() {
     }
 

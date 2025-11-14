@@ -14,8 +14,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Collections;
 import java.util.Map;
-// The 'Set' import is no longer needed
-
 @Profile("!test")
 @Service
 public class SuggestionService {
@@ -26,11 +24,8 @@ public class SuggestionService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=";
-
-    /**
-     * UPDATED: The 'missingKeywords' parameter is now removed.
-     */
+private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-latest:generateContent?key=";
+   
     public String generateSuggestions(String resumeText, String jdText, String companyType) {
         
         String apiUrl = GEMINI_API_URL + apiKey;
@@ -79,10 +74,7 @@ public class SuggestionService {
             return "Error: Could not parse AI response. " + e.getMessage();
         }
     }
-
-    /**
-     * UPDATED: The 'missingKeywords' parameter is now removed.
-     */
+    
     private String buildMasterPrompt(String resumeText, String jdText, String companyType) {
         
         String prompt = """
@@ -107,33 +99,37 @@ public class SuggestionService {
             ## Job Fit Score
             Give a percentage score (e.g., 75%%) and a one-sentence justification.
 
-            ## Resume Strengths
+            ## Resume Scorecard
+            Provide scores out of 100 for the following, with a brief justification for each.
+            **IMPORTANT:** The score MUST be in the format (Score/100).
+            * **Brevity:** (0-100 score) Is the resume concise? Penalize for long paragraphs.
+            * **Impact:** (0-100 score) Does it use quantifiable achievements and strong action verbs?
+            * **Technical Skills:** (0-100 score) How relevant are the resume's skills to the JD?
+            * **Style:** (0-100 score) Is the resume professional, clear, and easy to read?
+
+            ## Strengths
             * List 2-3 key strengths from the resume that directly align with the JD.
 
-            ## Resume Weaknesses
+            ## Weaknesses & Gaps
             * List 2-3 critical gaps or weaknesses where the resume does not meet the JD's requirements.
 
             ## Keyword Optimization
             * **Matching Keywords:** List the top 5-10 keywords found in both the resume and JD.
             * **Missing Keywords:** List the top 5-10 keywords from the JD that are *missing* from the resume.
-            * **Acronym Check:** Note if acronyms (e.g., 'ERP') are used without being spelled out, or vice-versa.
 
             ## Action Verbs & Metrics
             * **Action Verbs:** Check if bullet points start with strong action verbs (e.g., 'Managed,' 'Developed'). List any weak examples found (e.g., 'Responsible for...').
             * **Quantifiable Achievements:** Check if the resume uses metrics (e.g., '...by 15%%', '...over 100 users'). Give a specific example of where they could add a metric.
             
             ## Redundancy Check
-            * Point out any skills or phrases that are repeated unnecessarily and could be removed.
-              If no issues, just say "No major redundancy issues found."
+            * Point out any skills or phrases that are repeated unnecessarily.
 
             ## AI-Powered Suggestions
             * Based on the weaknesses, provide 2-3 actionable, full-sentence suggestions
               for how the user can (truthfully) update their resume.
             * **Tailor this advice for a %s-Based company.**
-              (e.g., for 'Product', focus on impact and innovation. For 'Service', focus on clients and adaptability.)
             """;
         
-        // UPDATED: The 'missingKeywords' argument is removed from String.format()
         return String.format(prompt, companyType, resumeText, jdText, companyType);
     }
 }

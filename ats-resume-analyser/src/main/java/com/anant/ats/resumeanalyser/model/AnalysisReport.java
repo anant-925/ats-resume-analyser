@@ -31,8 +31,6 @@ public class AnalysisReport {
 
     @Column(nullable = false)
     private String jobDescriptionSummary; // e.g., "Software Engineer at Google"
-
-    // Use @Lob for large text fields (like our AI report)
     @Lob
     @Column(columnDefinition = "TEXT", nullable = false)
     private String aiReport;

@@ -33,14 +33,10 @@ public class TextExtractionService {
 
         // We use a try-with-resources block to ensure the InputStream is automatically closed.
         try (InputStream inputStream = file.getInputStream()) {
-            
-            // Tika's parseToString method automatically detects the file type
-            // (PDF, DOCX, DOC, TXT, etc.) and returns the text content.
             String text = tika.parseToString(inputStream);
             return text;
             
         } catch (IOException | TikaException e) {
-            // Log the error in a real application
             System.err.println("Error parsing file: " + e.getMessage());
             throw e; // Re-throw the exception to be handled by the controller
         }

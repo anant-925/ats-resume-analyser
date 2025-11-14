@@ -1,26 +1,22 @@
 <!DOCTYPE html>
-<!-- 1. We declare that we are using the 'layout.html' file -->
 <html lang="en" xmlns:th="http://www.thymeleaf.org" 
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" 
       layout:decorate="~{layout}">
 <head>
-    <!-- 2. This title will replace the one in the layout -->
     <title>New Analysis</title>
 </head>
 <body>
 
-    <!-- 3. This whole block will be injected into the layout -->
-   <div layout:fragment="content">
+    <div layout:fragment="content">
         <div class="row justify-content-center">
             <div class="col-lg-8">
-                
                 <div class="text-center">
-                    <img src="https://placehold.co/400x200/0d6efd/ffffff?text=Resume+Analysis" 
+                    <img th:src="@{/images/4195798.jpg}" 
                          alt="Resume Analysis Illustration" 
-                         class="header-image rounded"
+                         class="header-image rounded shadow-sm"
+                         style="max-width: 500px; height: 250px; object-fit: cover;"
                          onerror="this.src='https://placehold.co/400x200/cccccc/ffffff?text=Image+Not+Found'">
                 </div>
-
                 <div class="content-card p-4 p-md-5">
 
                     <div class="header-section text-center mb-4">
@@ -66,6 +62,7 @@
                             <li id="loading-step-3" class="mb-2" style="display: none; opacity: 0; transition: opacity 0.5s ease;"><i class="bi bi-check-lg text-success"></i> Sending to AI for expert review...</li>
                         </ul>
                     </div>
+
                     <div th:if="${result != null}" class="results-section">
                         <h2 class="h4 mb-4 text-dark">Analysis for <span class="fw-bold text-primary" th:text="${fileName}"></span></h2>
 
@@ -78,60 +75,123 @@
                             </div>
                         </div>
 
+                        <div class="scorecard-section mb-4">
+                            <h3 class="h5 fw-semibold text-dark">📊 Resume Scorecard</h3>
+                            <div class="card card-body bg-light-subtle border-0 rounded-3">
+                                <div class="row g-4" id="score-visualization">
+                                    <p class="text-muted">Loading scores...</p>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="ai-report-section">
                             <h3 class="h5 fw-semibold text-dark">💡 AI-Powered Report</h3>
                             <div class="card card-body bg-light-subtle border-0 rounded-3">
-                                <div th:utext="${@markdownRenderer.render(result.aiSuggestions)}"></div>
+                                <div id="ai-report-text" th:utext="${@markdownRenderer.render(result.aiSuggestions)}"></div>
                             </div>
                         </div>
-                    </div>
-                    
-                </div>
+                    </div> </div>
             </div>
         </div>
     </div>
+
     <th:block layout:fragment="scripts">
-    <script>
-        // Find the form and the loading indicator
-        const analysisForm = document.getElementById('analysis-form');
-        const loadingIndicator = document.getElementById('loading-indicator');
-        
-        const submitButton = analysisForm.querySelector('button[type="submit"]');
-
-        if (analysisForm) {
-            const formElement = analysisForm.querySelector('form');
+    
+        <script>
+            // Find the form and the loading indicator
+            const analysisForm = document.getElementById('analysis-form');
+            const loadingIndicator = document.getElementById('loading-indicator');
             
-            formElement.addEventListener('submit', function() {
+            if (analysisForm) { // Make sure the form exists
+                const submitButton = analysisForm.querySelector('button[type="submit"]');
+                const formElement = analysisForm.querySelector('form');
                 
-                // 1. Disable the button and change text to prevent double-clicks
-                submitButton.disabled = true;
-                submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...';
+                formElement.addEventListener('submit', function() {
+                    
+                    submitButton.disabled = true;
+                    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...';
+                    analysisForm.style.display = 'none';
+                    loadingIndicator.style.display = 'block';
 
-                // 2. Hide the form
-                analysisForm.style.display = 'none';
-                
-                // 3. Show the loading indicator
-                loadingIndicator.style.display = 'block';
+                    setTimeout(() => {
+                        const step2 = document.getElementById('loading-step-2');
+                        if (step2) {
+                            step2.style.display = 'block';
+                            setTimeout(() => step2.style.opacity = 1, 50);
+                        }
+                    }, 2000);
+                    
+                    setTimeout(() => {
+                        const step3 = document.getElementById('loading-step-3');
+                        if (step3) {
+                            step3.style.display = 'block';
+                            setTimeout(() => step3.style.opacity = 1, 50);
+                        }
+                    }, 4000); 
+                });
+            }
+        </script>
 
-                // 4. Animate the "engaging text" lines
-                setTimeout(() => {
-                    const step2 = document.getElementById('loading-step-2');
-                    if (step2) {
-                        step2.style.display = 'block';
-                        setTimeout(() => step2.style.opacity = 1, 50); // fade in
-                    }
-                }, 2000); // Show after 2 seconds
+        <script th:if="${result != null}">
+            document.addEventListener('DOMContentLoaded', function() {
                 
-                setTimeout(() => {
-                    const step3 = document.getElementById('loading-step-3');
-                    if (step3) {
-                        step3.style.display = 'block';
-                        setTimeout(() => step3.style.opacity = 1, 50); // fade in
-                    }
-                }, 4000); 
+                // 1. Get the raw text from the AI report
+                const reportElement = document.getElementById('ai-report-text');
+                if (!reportElement) return;
+                
+                // Use innerHTML to find the text.
+                const rawHTML = reportElement.innerHTML;
+                const visualizationContainer = document.getElementById('score-visualization');
+
+                // 2. A Regex to find our scores, e.g., "Brevity:** (85/100)"
+                const scoreRegex = /<strong>(Brevity|Impact|Technical Skills|Style):<\/strong>\s*\((\d{1,3})\/100\)/g;
+
+                let scores = [];
+                let match;
+                
+                // 3. Loop through all matches found in the text
+                while ((match = scoreRegex.exec(rawHTML)) !== null) {
+                    scores.push({
+                        name: match[1],
+                        value: parseInt(match[2])
+                    });
+                }
+
+                // 4. Build and inject the new HTML (the progress bars)
+                if (scores.length > 0) {
+                    let html = '';
+                    scores.forEach(score => {
+                        let barColor = 'bg-success'; // green
+                        if (score.value < 75) barColor = 'bg-warning text-dark'; // yellow
+                        if (score.value < 50) barColor = 'bg-danger'; // red
+
+                        html += `
+                            <div class="col-md-6">
+                                <h6 class="text-dark fw-medium">${score.name}</h6>
+                                <div class="progress" style="height: 25px;">
+                                    <div class="progress-bar ${barColor}" 
+                                         role="progressbar" 
+                                         style="width: ${score.value}%;" 
+                                         aria-valuenow="${score.value}" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="100">
+                                        ${score.value}%
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    visualizationContainer.innerHTML = html;
+                } else {
+                    visualizationContainer.innerHTML = '<p class="text-muted">Could not parse scores from the AI report.</p>';
+                }
+                
+                // 5. Clean up the text report by removing the scores we just visualized
+                reportElement.innerHTML = reportElement.innerHTML.replace(/<h2>Resume Scorecard<\/h2>/, '');
+                reportElement.innerHTML = reportElement.innerHTML.replace(/<ul>\s*(<li><strong>(Brevity|Impact|Technical Skills|Style):<\/strong>.*?<\/li>\s*){4}<\/ul>/, '');
+
             });
-        }
-    </script>
-</th:block>
+        </script>
+    </th:block>
 </body>
 </html>

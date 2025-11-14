@@ -14,10 +14,6 @@ public class RegistrationController {
 
     @Autowired
     private UserService userService;
-
-    /**
-     * Shows the registration page.
-     */
     @GetMapping("/register")
     public String showRegistrationForm(Model model) {
         // This is a placeholder for passing data *to* the form if needed
@@ -60,7 +56,6 @@ public String showLoginForm(@RequestParam(value = "error", required = false) Str
         model.addAttribute("logoutMessage", "You have been logged out.");
     }
 
-    // This tells Spring to render the 'login.html' template
     return "login";
 }
 }
